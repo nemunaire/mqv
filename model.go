@@ -43,7 +43,7 @@ type Model struct {
 	saveNotice      string
 	width           int
 	height          int
-	messageSaving  bool
+	messageSaving   bool
 	// stateParts fields
 	parts          []MessagePart
 	partsCursor    int
@@ -478,13 +478,17 @@ func (m Model) renderBottom() string {
 		label := fmt.Sprintf("  Fetching subjects: %d / %d  ", m.loadingDone, m.loadingTotal)
 		return dimStyle.Render(label) + "\n  " + m.progress.View()
 	}
-	status := statusBarStyle.Render(
-		fmt.Sprintf(" %d message(s) │ Enter: open │ r: refresh │ F: flush │ q: quit ", len(m.list.Items())),
-	)
+	left := fmt.Sprintf(" %d message(s) │ Enter: open │ r: refresh │ F: flush │ q: quit ", len(m.list.Items()))
+	reason := ""
 	if item, ok := m.list.SelectedItem().(queueItem); ok {
-		if reason := item.entry.Reason; reason != "" {
-			return status + "\n " + reasonStyle.Render(reason)
-		}
+		reason = item.entry.Reason
 	}
-	return status
+	if reason == "" {
+		return statusBarStyle.Render(left)
+	}
+	right := " " + reason + " "
+	rightWidth := lipgloss.Width(right)
+	leftPart := statusBarStyle.Width(m.width - rightWidth).Render(left)
+	rightPart := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Background(lipgloss.Color("241")).Render(right)
+	return leftPart + rightPart
 }
