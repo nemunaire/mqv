@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os/exec"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -31,6 +33,24 @@ func loadQueueCmd() tea.Cmd {
 			return queueErrMsg{err}
 		}
 		return queueParsedMsg{entries}
+	}
+}
+
+func flushQueueCmd() tea.Cmd {
+	return func() tea.Msg {
+		exec.Command("postqueue", "-f").Run()
+		entries, err := loadQueue()
+		if err != nil {
+			return queueErrMsg{err}
+		}
+		return queueParsedMsg{entries}
+	}
+}
+
+func requeueMessageCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		exec.Command("postsuper", "-r", id).Run()
+		return nil
 	}
 }
 

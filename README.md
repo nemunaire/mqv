@@ -48,6 +48,7 @@ go install github.com/nemunaire/mqv@latest
 | `↑` / `↓` | Navigate messages                   |
 | `Enter`    | Open message                        |
 | `r`        | Refresh queue                       |
+| `F`        | Flush queue (`postqueue -f`)        |
 | `q`        | Quit                                |
 
 Subjects are fetched lazily in parallel via `postcat` as the list loads; a progress bar tracks completion.
@@ -59,6 +60,7 @@ Subjects are fetched lazily in parallel via `postcat` as the list loads; a progr
 | `↑↓` / `Space` / `PgUp` / `PgDn` | Scroll      |
 | `H`             | Toggle full headers / short headers |
 | `s`             | Save raw EML to `~/QUEUEID.eml` |
+| `F`             | Requeue message (`postsuper -r`) |
 | `v`             | Browse MIME parts               |
 | `q`             | Back to queue list              |
 

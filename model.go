@@ -210,6 +210,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.list.SetItems(nil)
 				_ = m.progress.SetPercent(0)
 				return m, loadQueueCmd()
+			case "F":
+				m.entries = nil
+				m.entryIndex = nil
+				m.loadingTotal = 0
+				m.loadingDone = 0
+				m.list.SetItems(nil)
+				_ = m.progress.SetPercent(0)
+				return m, flushQueueCmd()
 			case "enter":
 				if item, ok := m.list.SelectedItem().(queueItem); ok {
 					return m, loadMessageCmd(item.entry.ID)
@@ -254,6 +262,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.refreshViewport()
 				m.viewport.GotoTop()
 				return m, nil
+			case "F":
+				return m, requeueMessageCmd(m.currentID)
 			case "v":
 				m.parts = extractParts(m.currentRaw)
 				m.partsCursor = 0
@@ -384,7 +394,7 @@ func (m Model) View() string {
 			headersHint = "H: short headers"
 		}
 		status := statusBarStyle.Render(
-			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ s: save EML │ v: parts │ %s │ q: back │ %d%% ", headersHint, scrollPct),
+			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ s: save EML │ F: requeue │ v: parts │ %s │ q: back │ %d%% ", headersHint, scrollPct),
 		)
 		notice := ""
 		if m.messageSaving {
@@ -464,7 +474,7 @@ func (m Model) renderBottom() string {
 		return dimStyle.Render(label) + "\n  " + m.progress.View()
 	}
 	status := statusBarStyle.Render(
-		fmt.Sprintf(" %d message(s) │ Enter: open │ r: refresh │ q: quit ", len(m.list.Items())),
+		fmt.Sprintf(" %d message(s) │ Enter: open │ r: refresh │ F: flush │ q: quit ", len(m.list.Items())),
 	)
 	if item, ok := m.list.SelectedItem().(queueItem); ok {
 		if reason := item.entry.Reason; reason != "" {
