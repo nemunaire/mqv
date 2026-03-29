@@ -42,6 +42,7 @@ type Model struct {
 	saveNotice      string
 	width           int
 	height          int
+	messageSaving  bool
 	// stateParts fields
 	parts          []MessagePart
 	partsCursor    int
@@ -215,6 +216,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case stateMessage:
+			if m.messageSaving {
+				switch msg.String() {
+				case "esc":
+					m.messageSaving = false
+					m.partsSaveInput.Blur()
+					return m, nil
+				case "enter":
+					name := strings.TrimSpace(m.partsSaveInput.Value())
+					content := m.currentRaw
+					m.messageSaving = false
+					m.partsSaveInput.Blur()
+					return m, saveMessageAsCmd(content, name)
+				default:
+					var cmd tea.Cmd
+					m.partsSaveInput, cmd = m.partsSaveInput.Update(msg)
+					return m, cmd
+				}
+			}
 			switch msg.String() {
 			case "q":
 				m.state = stateList
@@ -223,7 +242,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c":
 				return m, tea.Quit
 			case "s":
-				return m, saveCmd(m.currentID, m.currentRaw)
+				m.messageSaving = true
+				m.saveNotice = ""
+				m.partsSaveInput.SetValue(m.currentID + ".eml")
+				m.partsSaveInput.CursorEnd()
+				m.partsSaveInput.Focus()
+				return m, textinput.Blink
 			case "H":
 				m.showFullHeaders = !m.showFullHeaders
 				m.refreshViewport()
@@ -352,7 +376,9 @@ func (m Model) View() string {
 			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ s: save EML │ v: parts │ %s │ q: back │ %d%% ", headersHint, scrollPct),
 		)
 		notice := ""
-		if m.saveNotice != "" {
+		if m.messageSaving {
+			notice = "\n Save as: " + m.partsSaveInput.View()
+		} else if m.saveNotice != "" {
 			notice = "\n" + saveNoticeStyle.Render(m.saveNotice)
 		}
 		return header + "\n" + m.viewport.View() + "\n" + status + notice

@@ -54,9 +54,9 @@ func loadMessageCmd(id string) tea.Cmd {
 	}
 }
 
-func saveCmd(id, content string) tea.Cmd {
+func saveMessageAsCmd(content, name string) tea.Cmd {
 	return func() tea.Msg {
-		path, err := saveMessage(id, content)
+		path, err := savePart([]byte(content), name)
 		if err != nil {
 			return saveErrMsg{err}
 		}

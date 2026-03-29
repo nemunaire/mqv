@@ -410,15 +410,3 @@ func renderHTML(html string) string {
 	return string(out)
 }
 
-// saveMessage writes the raw EML content to ~/QUEUEID.eml.
-func saveMessage(id, content string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("could not determine home directory: %w", err)
-	}
-	path := filepath.Join(home, id+".eml")
-	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
-		return "", fmt.Errorf("write %s: %w", path, err)
-	}
-	return path, nil
-}
