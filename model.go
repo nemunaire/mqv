@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
@@ -16,8 +18,10 @@ import (
 type appState int
 
 const (
-	stateList    appState = iota
-	stateMessage appState = iota
+	stateList     appState = iota
+	stateMessage  appState = iota
+	stateParts    appState = iota
+	statePartView appState = iota
 )
 
 // ── Model ─────────────────────────────────────────────────────────────────────
@@ -38,6 +42,12 @@ type Model struct {
 	saveNotice      string
 	width           int
 	height          int
+	// stateParts fields
+	parts          []MessagePart
+	partsCursor    int
+	partsSaving    bool
+	partsSaveInput textinput.Model
+	partSaveNotice string
 }
 
 func initialModel() Model {
@@ -55,11 +65,16 @@ func initialModel() Model {
 
 	vp := viewport.New(80, 20)
 
+	ti := textinput.New()
+	ti.Placeholder = "filename"
+	ti.CharLimit = 255
+
 	return Model{
-		state:    stateList,
-		list:     l,
-		progress: prog,
-		viewport: vp,
+		state:          stateList,
+		list:           l,
+		progress:       prog,
+		viewport:       vp,
+		partsSaveInput: ti,
 	}
 }
 
@@ -101,6 +116,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.Height = msg.Height - 2
 		if m.state == stateMessage && m.currentRaw != "" {
 			m.refreshViewport()
+		} else if m.state == statePartView && len(m.parts) > 0 {
+			p := m.parts[m.partsCursor]
+			content := ansi.Wrap(renderPart(p.CT, "", "", bytes.NewReader(p.Data)), m.viewport.Width, "")
+			m.viewport.SetContent(content)
 		}
 		return m, nil
 
@@ -166,6 +185,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.saveNotice = "Save error: " + msg.err.Error()
 		return m, nil
 
+	case partSavedMsg:
+		m.partSaveNotice = "Saved: " + msg.path
+		return m, nil
+
+	case partSaveErrMsg:
+		m.partSaveNotice = "Save error: " + msg.err.Error()
+		return m, nil
+
 	case tea.KeyMsg:
 		switch m.state {
 
@@ -202,6 +229,85 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.refreshViewport()
 				m.viewport.GotoTop()
 				return m, nil
+			case "v":
+				m.parts = extractParts(m.currentRaw)
+				m.partsCursor = 0
+				m.partsSaving = false
+				m.partSaveNotice = ""
+				m.partsSaveInput.SetValue("")
+				m.partsSaveInput.Blur()
+				m.state = stateParts
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.viewport, cmd = m.viewport.Update(msg)
+			return m, cmd
+
+		case stateParts:
+			if m.partsSaving {
+				switch msg.String() {
+				case "esc":
+					m.partsSaving = false
+					m.partsSaveInput.Blur()
+					return m, nil
+				case "enter":
+					name := strings.TrimSpace(m.partsSaveInput.Value())
+					part := m.parts[m.partsCursor]
+					m.partsSaving = false
+					m.partsSaveInput.Blur()
+					return m, savePartCmd(part.Data, name)
+				default:
+					var cmd tea.Cmd
+					m.partsSaveInput, cmd = m.partsSaveInput.Update(msg)
+					return m, cmd
+				}
+			}
+			switch msg.String() {
+			case "q", "esc":
+				m.state = stateMessage
+				m.partSaveNotice = ""
+				return m, nil
+			case "ctrl+c":
+				return m, tea.Quit
+			case "up", "k":
+				if m.partsCursor > 0 {
+					m.partsCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.partsCursor < len(m.parts)-1 {
+					m.partsCursor++
+				}
+				return m, nil
+			case "enter":
+				if len(m.parts) > 0 {
+					p := m.parts[m.partsCursor]
+					if strings.HasPrefix(p.MediaType, "text/") {
+						content := ansi.Wrap(renderPart(p.CT, "", "", bytes.NewReader(p.Data)), m.viewport.Width, "")
+						m.viewport.SetContent(content)
+						m.viewport.GotoTop()
+						m.state = statePartView
+						return m, nil
+					}
+				}
+			case "s":
+				if len(m.parts) > 0 {
+					m.partsSaving = true
+					m.partSaveNotice = ""
+					m.partsSaveInput.SetValue(m.parts[m.partsCursor].Name)
+					m.partsSaveInput.CursorEnd()
+					m.partsSaveInput.Focus()
+					return m, textinput.Blink
+				}
+			}
+
+		case statePartView:
+			switch msg.String() {
+			case "q", "esc":
+				m.state = stateParts
+				return m, nil
+			case "ctrl+c":
+				return m, tea.Quit
 			}
 			var cmd tea.Cmd
 			m.viewport, cmd = m.viewport.Update(msg)
@@ -243,13 +349,73 @@ func (m Model) View() string {
 			headersHint = "H: short headers"
 		}
 		status := statusBarStyle.Render(
-			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ s: save EML │ %s │ q: back │ %d%% ", headersHint, scrollPct),
+			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ s: save EML │ v: parts │ %s │ q: back │ %d%% ", headersHint, scrollPct),
 		)
 		notice := ""
 		if m.saveNotice != "" {
 			notice = "\n" + saveNoticeStyle.Render(m.saveNotice)
 		}
 		return header + "\n" + m.viewport.View() + "\n" + status + notice
+
+	case stateParts:
+		title := titleStyle.Render(fmt.Sprintf("Parts: %s", m.currentID))
+
+		// Compute name column width from remaining terminal space.
+		// Columns: #(3) + gap(2) + CT(30) + gap(2) + size(10) + gap(2) = 49
+		nameW := m.width - 49
+		if nameW < 8 {
+			nameW = 8
+		}
+
+		header := dimStyle.Render(fmt.Sprintf(
+			"%-3s  %-30s  %-*s  %10s",
+			"#", "Content-Type", nameW, "Name", "Size",
+		))
+
+		var rows strings.Builder
+		for i, p := range m.parts {
+			name := p.Name
+			if name == "" {
+				name = "-"
+			}
+			if len(name) > nameW {
+				name = name[:nameW-1] + "…"
+			}
+			line := fmt.Sprintf(
+				"%-3d  %-30s  %-*s  %10s",
+				p.Index, p.MediaType, nameW, name, formatSize(p.Size),
+			)
+			if i == m.partsCursor {
+				rows.WriteString(selectedStyle.Render(line))
+			} else {
+				rows.WriteString(line)
+			}
+			rows.WriteByte('\n')
+		}
+		if len(m.parts) == 0 {
+			rows.WriteString(dimStyle.Render("  (no parts found)"))
+			rows.WriteByte('\n')
+		}
+
+		status := statusBarStyle.Render(" ↑↓/j/k: navigate │ enter: view text part │ s: save part │ q/esc: back ")
+
+		bottom := ""
+		if m.partsSaving {
+			bottom = "\n Save as: " + m.partsSaveInput.View()
+		} else if m.partSaveNotice != "" {
+			bottom = "\n" + saveNoticeStyle.Render(m.partSaveNotice)
+		}
+
+		return title + "\n" + header + "\n" + rows.String() + status + bottom
+
+	case statePartView:
+		p := m.parts[m.partsCursor]
+		title := titleStyle.Render(fmt.Sprintf("Part %d: %s", p.Index, p.MediaType))
+		scrollPct := int(m.viewport.ScrollPercent() * 100)
+		status := statusBarStyle.Render(
+			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ q/esc: back to parts │ %d%% ", scrollPct),
+		)
+		return title + "\n" + m.viewport.View() + "\n" + status
 	}
 
 	return ""

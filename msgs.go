@@ -19,6 +19,8 @@ type messageLoadedMsg struct {
 type messageErrMsg struct{ err error }
 type savedMsg struct{ path string }
 type saveErrMsg struct{ err error }
+type partSavedMsg struct{ path string }
+type partSaveErrMsg struct{ err error }
 
 // ── Tea commands ──────────────────────────────────────────────────────────────
 
@@ -59,5 +61,15 @@ func saveCmd(id, content string) tea.Cmd {
 			return saveErrMsg{err}
 		}
 		return savedMsg{path}
+	}
+}
+
+func savePartCmd(data []byte, name string) tea.Cmd {
+	return func() tea.Msg {
+		path, err := savePart(data, name)
+		if err != nil {
+			return partSaveErrMsg{err}
+		}
+		return partSavedMsg{path}
 	}
 }
