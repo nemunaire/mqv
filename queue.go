@@ -11,6 +11,7 @@ import (
 
 type QueueEntry struct {
 	ID      string
+	OnHold  bool
 	Size    int
 	Date    time.Time
 	Sender  string
@@ -114,9 +115,10 @@ func parseQueueLine(line string) *QueueEntry {
 		return nil
 	}
 
-	id := fields[0]
+	raw := fields[0]
+	onHold := strings.HasSuffix(raw, "!")
 	// Strip trailing status character (* or !)
-	id = strings.TrimRight(id, "*!")
+	id := strings.TrimRight(raw, "*!")
 
 	var size int
 	fmt.Sscanf(fields[1], "%d", &size)
@@ -137,6 +139,7 @@ func parseQueueLine(line string) *QueueEntry {
 
 	return &QueueEntry{
 		ID:     id,
+		OnHold: onHold,
 		Size:   size,
 		Date:   t,
 		Sender: sender,

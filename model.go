@@ -262,6 +262,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.refreshViewport()
 				m.viewport.GotoTop()
 				return m, nil
+			case "h":
+				if idx, ok := m.entryIndex[m.currentID]; ok {
+					if m.entries[idx].OnHold {
+						m.entries[idx].OnHold = false
+						return m, releaseMessageCmd(m.currentID)
+					}
+					m.entries[idx].OnHold = true
+					return m, holdMessageCmd(m.currentID)
+				}
 			case "D":
 				id := m.currentID
 				m.state = stateList
@@ -398,8 +407,12 @@ func (m Model) View() string {
 		if m.showFullHeaders {
 			headersHint = "H: short headers"
 		}
+		holdHint := "h: hold"
+		if idx, ok := m.entryIndex[m.currentID]; ok && m.entries[idx].OnHold {
+			holdHint = "h: release"
+		}
 		status := statusBarStyle.Render(
-			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ s: save EML │ D: delete │ F: requeue │ v: parts │ %s │ q: back │ %d%% ", headersHint, scrollPct),
+			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ s: save EML │ D: delete │ F: requeue │ %s │ v: parts │ %s │ q: back │ %d%% ", holdHint, headersHint, scrollPct),
 		)
 		notice := ""
 		if m.messageSaving {
