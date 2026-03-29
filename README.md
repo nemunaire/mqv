@@ -60,6 +60,7 @@ Subjects are fetched lazily in parallel via `postcat` as the list loads; a progr
 | `↑↓` / `Space` / `PgUp` / `PgDn` | Scroll      |
 | `H`             | Toggle full headers / short headers |
 | `s`             | Save raw EML to `~/QUEUEID.eml` |
+| `D`             | Delete message (`postsuper -d`) |
 | `F`             | Requeue message (`postsuper -r`) |
 | `v`             | Browse MIME parts               |
 | `q`             | Back to queue list              |

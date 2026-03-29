@@ -262,6 +262,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.refreshViewport()
 				m.viewport.GotoTop()
 				return m, nil
+			case "D":
+				id := m.currentID
+				m.state = stateList
+				m.saveNotice = ""
+				return m, deleteMessageCmd(id)
 			case "F":
 				return m, requeueMessageCmd(m.currentID)
 			case "v":
@@ -394,7 +399,7 @@ func (m Model) View() string {
 			headersHint = "H: short headers"
 		}
 		status := statusBarStyle.Render(
-			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ s: save EML │ F: requeue │ v: parts │ %s │ q: back │ %d%% ", headersHint, scrollPct),
+			fmt.Sprintf(" ↑↓/SPC/PgUp/Dn: scroll │ s: save EML │ D: delete │ F: requeue │ v: parts │ %s │ q: back │ %d%% ", headersHint, scrollPct),
 		)
 		notice := ""
 		if m.messageSaving {

@@ -47,6 +47,13 @@ func flushQueueCmd() tea.Cmd {
 	}
 }
 
+func deleteMessageCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		exec.Command("postsuper", "-d", id).Run()
+		return nil
+	}
+}
+
 func requeueMessageCmd(id string) tea.Cmd {
 	return func() tea.Msg {
 		exec.Command("postsuper", "-r", id).Run()
