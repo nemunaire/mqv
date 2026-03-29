@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -366,7 +367,17 @@ func (m Model) View() string {
 		return m.list.View() + "\n" + m.renderBottom()
 
 	case stateMessage:
-		header := titleStyle.Render(fmt.Sprintf("Message: %s", m.currentID))
+		title := titleStyle.Render(fmt.Sprintf("Message: %s", m.currentID))
+		header := title
+		if idx, ok := m.entryIndex[m.currentID]; ok {
+			if reason := m.entries[idx].Reason; reason != "" {
+				gap := m.width - lipgloss.Width(title) - lipgloss.Width(reason) - 2
+				if gap < 1 {
+					gap = 1
+				}
+				header = title + strings.Repeat(" ", gap) + reasonStyle.Render(reason)
+			}
+		}
 		scrollPct := int(m.viewport.ScrollPercent() * 100)
 		headersHint := "H: full headers"
 		if m.showFullHeaders {
@@ -452,7 +463,13 @@ func (m Model) renderBottom() string {
 		label := fmt.Sprintf("  Fetching subjects: %d / %d  ", m.loadingDone, m.loadingTotal)
 		return dimStyle.Render(label) + "\n  " + m.progress.View()
 	}
-	return statusBarStyle.Render(
+	status := statusBarStyle.Render(
 		fmt.Sprintf(" %d message(s) │ Enter: open │ r: refresh │ q: quit ", len(m.list.Items())),
 	)
+	if item, ok := m.list.SelectedItem().(queueItem); ok {
+		if reason := item.entry.Reason; reason != "" {
+			return status + "\n " + reasonStyle.Render(reason)
+		}
+	}
+	return status
 }

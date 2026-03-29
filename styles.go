@@ -12,4 +12,5 @@ var (
 	partSepStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	attachStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 	headerKeyStyle  = lipgloss.NewStyle().Bold(true)
+	reasonStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 )
